@@ -200,6 +200,7 @@ Allow override assembly settings by chassis
 ## LootableUniqueMech
 ```
     "LootableUniqueMech": {
+	  "BlockAssembly": false,	
       "ReplaceID": "mechdef_annihilator_ANH-2A",
 	  "randomSearchTags":{
 		"ShouldHaveTags":[],
@@ -210,11 +211,19 @@ Allow override assembly settings by chassis
 ```
 
 Logic:
-if player have unit with this chassiss it will try to replace it.
-if ReplaceID is not empty - it will just replace current unit to this one.
-if ReplaceID is empty it will try to find unit by tags (method is the same as for contract opfor generation, which means CustomUnitsSpawn behavior applied)
-if ShouldHaveTags is empty list - it will fill ShouldHaveTags using MechTags, remove ShouldNotHaveTags (from current custom), remove ExcludeSelfTags (from current custom) 
-and remove UniqieReplaceSearchExcludeTags (got from mod settings, default "unit_rarity_chassis_unique", "unit_unique")
+if BlockAssembly is true and player have a unit with this chassis, full salvage or assembly will be blocked
+if BlockAssembly is false and player have unit with this chassis it will try to replace it with another chassis type.
+  if ReplaceID is not empty - it will just replace current unit to this one.
+  if ReplaceID is empty it will try to find unit by tags (method is the same as for contract opfor generation, which means CustomUnitsSpawn behavior applied)
+  if ShouldHaveTags is empty list - it will fill ShouldHaveTags using MechTags, remove ShouldNotHaveTags (from current custom), remove ExcludeSelfTags (from current custom) 
+    and remove UniqieReplaceSearchExcludeTags (got from mod settings, default "unit_rarity_chassis_unique", "unit_unique")
+	
+BlockAssembly as true blocks assembly from parts or readying of fully stored mech. It automatically splits any full salvage mech, event results or lootback rewards to mech parts instead.
+
+## Assemble without armor
+If flag `RemoveArmorOnAssembly` is set to true, any mechs assembled from parts or readied from storage will have no armor.
+
+Full salvage mechs and mechs gained from events or lootboxes will not be changed.
 
 ----------------
 ## Thanks:

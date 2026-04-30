@@ -307,6 +307,8 @@ public class Settings
 
     public bool ShowSalvageFloaties = false;
 
+    public bool RemoveArmorOnAssembly = false;
+
     public float[,] PartCountPenalty = new float[,]
     {
         { 3, 2 },

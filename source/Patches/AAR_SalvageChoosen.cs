@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using BattleTech.BinkMedia;
+using CustomComponents;
 using UnityEngine.EventSystems;
 
 namespace CustomSalvage;
@@ -212,6 +213,20 @@ internal static class AAR_SalvageChosen_OnAddItem
             if (controller == null) { goto main_process; }
             if (controller.salvageDef == null) { goto main_process; }
             if (controller.salvageDef.Type != SalvageDef.SalvageType.MECH) { goto main_process; }
+
+            if (controller.salvageDef.mechDef.Chassis.Is<LootableUniqueMech>(out var ulm) && ulm.BlockAssembly)
+            {
+                string chassisID = controller.salvageDef.mechDef.ChassisID;
+                ContractHelper contractHelper = new ContractHelper(__instance.contract, false);
+                if (__instance.Sim.IsHaveActiveChassis(chassisID) || contractHelper.IsChassisExistsFinalPotentialSalvage(chassisID))
+                {
+                    __runOriginal = false;
+                    GenericPopupBuilder.Create("UNABLE TO COMPLY", $"Only allowed to have one assembled copy of this unit").CancelOnEscape().Render();
+                    __result = false;
+                    return;
+                }
+            }
+
             if (Control.Instance.Settings.MaxFullUnitsInSalvage > 0)
             {
                 int fullunits = 0;

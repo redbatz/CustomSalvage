@@ -264,8 +264,7 @@ internal static class Contract_GenerateSalvage
     public static void AddMechToSalvage(MechDef mech, ContractHelper contract, SimGameState simgame, SimGameConstants constants, bool can_upgrade, bool force_disassemble)
     {
         Log.Main.Debug?.Log($"--- Salvaging mech {mech.Description.Id}");
-        int numparts = mech.IsSquad() ? PartsNumCalculations.SquadPartsCount(mech) : Control.Instance.GetNumParts(mech);
-        bool full_mech_salvage = Control.Instance.Settings.FullEnemyUnitSalvage;
+        int numparts = mech.IsSquad() ? PartsNumCalculations.SquadPartsCount(mech) : Control.Instance.GetNumParts(mech); bool full_mech_salvage = Control.Instance.Settings.FullEnemyUnitSalvage;
         if (force_disassemble) { full_mech_salvage = false; }
         if ((full_mech_salvage) && (mech.IsVehicle() == false) && (mech.IsSquad() == false)) {
             if (mech.IsLocationDestroyed(ChassisLocations.CenterTorso)) {
@@ -301,8 +300,15 @@ internal static class Contract_GenerateSalvage
         }
         try
         {
-            var mech_to_salvage = ChassisHandler.FindMechReplace(simgame, contract, mech);
-            if (mech != mech_to_salvage) {
+            var mech_to_salvage = ChassisHandler.FindMechReplace(simgame, contract, mech, out var forceDisassemble);
+            if (forceDisassemble)
+            {
+                Log.Main.Debug?.Log($"--- mech has forced disassembly: {mech.Description.Id}");
+                full_mech_salvage = false;
+                mech_to_salvage = mech;
+            } 
+            else if (mech != mech_to_salvage) 
+            {
                 Log.Main.Debug?.Log($"--- mech has salvage replacement {mech.Description.Id} -> {mech_to_salvage.Description.Id}");
                 full_mech_salvage = false; 
             }
