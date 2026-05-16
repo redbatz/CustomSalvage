@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using BattleTech;
 using BattleTech.Data;
+using BattleTech.UI;
 using CustomComponents;
 
 namespace CustomSalvage;
