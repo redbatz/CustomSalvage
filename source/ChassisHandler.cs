@@ -1153,7 +1153,11 @@ public static partial class ChassisHandler
                 Log.Main.Debug?.Log($"- {item.mechid}[{item.mechname}] {item.used}/{item.spare}/{item.count}");
             var op = used_parts.Where(i => i.mechid != mech.Description.Id).Sum(i => i.used);
             Log.Main.Debug?.Log($"-- making mech other_parts:{op} total used {all_parts}/{used_empty_parts}");
-            MakeMech(mechBay.Sim, op, all_parts, used_empty_parts);
+            MechDef createdMech = MakeMech(mechBay.Sim, op, all_parts, used_empty_parts);
+            if (Control.Instance.Settings.RemoveArmorOnAssembly)
+            {
+                RemoveArmorFromMech(createdMech);
+            }
             used_parts.Clear();
             Log.Main.Debug?.Log($"-- refresh mechlab");
             mechBay.RefreshData(false);
