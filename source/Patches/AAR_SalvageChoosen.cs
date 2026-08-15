@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using UnityEngine;
 using BattleTech.BinkMedia;
+using CustomComponents;
 using UnityEngine.EventSystems;
 
 namespace CustomSalvage;
@@ -212,6 +213,19 @@ internal static class AAR_SalvageChosen_OnAddItem
             if (controller == null) { goto main_process; }
             if (controller.salvageDef == null) { goto main_process; }
             if (controller.salvageDef.Type != SalvageDef.SalvageType.MECH) { goto main_process; }
+
+            if (controller.salvageDef.mechDef.Chassis.Is<LootableUniqueMech>(out var ulm) && ulm.BlockAssembly)
+            {
+                string chassisID = controller.salvageDef.mechDef.ChassisID;
+                if (__instance.Sim.IsHaveActiveChassis(chassisID) || IsChassisAlreadyInSelectedSalvage(chassisID, __instance))
+                {
+                    __runOriginal = false;
+                    GenericPopupBuilder.Create("UNABLE TO COMPLY", $"Only allowed to have one assembled copy of this unit").CancelOnEscape().Render();
+                    __result = false;
+                    return;
+                }
+            }
+
             if (Control.Instance.Settings.MaxFullUnitsInSalvage > 0)
             {
                 int fullunits = 0;
@@ -285,6 +299,22 @@ internal static class AAR_SalvageChosen_OnAddItem
         {
             UIManager.logger.LogException(e);
         }
+    }
+
+    // Not really needed to check as any extra copies should have been made to parts, but extra safe guard
+    private static bool IsChassisAlreadyInSelectedSalvage(string chassisId, AAR_SalvageChosen aarSalvageChosen)
+    {
+        foreach (InventoryItemElement_NotListView inventoryItemElementNotListView in aarSalvageChosen.PriorityInventory)
+        {
+            SalvageDef salvageDef = inventoryItemElementNotListView.controller?.salvageDef;
+            if (salvageDef == null) { continue; }
+            if (salvageDef.Type != SalvageDef.SalvageType.MECH) { continue; }
+            if (salvageDef.ComponentType != ComponentType.MechFull) { continue; }
+            if (salvageDef.mechDef == null) { continue; }
+            if (salvageDef.mechDef.chassisID != chassisId) { continue; }
+            return true;
+        }
+        return false;
     }
 }
 

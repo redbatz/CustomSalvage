@@ -351,7 +351,11 @@ public static partial class ChassisHandler
             RemoveMechPart(mech.Description.Id, chassis.MechPartMax);
             infoWidget.SetData(mechBay, null);
             Log.Main.Debug?.Log($"-- making mech {mech.Description.Id} {chassis.Description.Id}");
-            MakeMech(mechBay.Sim, 0, chassis.MechPartMax, used_empty_parts);
+            MechDef createdMech = MakeMech(mechBay.Sim, 0, chassis.MechPartMax, used_empty_parts);
+            if (Control.Instance.Settings.RemoveArmorOnAssembly)
+            {
+                RemoveArmorFromMech(createdMech);
+            }
             Log.Main.Debug?.Log($"-- refresh mechlab");
             mechBay.RefreshData(false);
             Log.Main.Debug?.Log($"-- rest parts {mech.Description.Id} {chassis.Description.Id} {chassis.MechPartCount}");
@@ -363,7 +367,7 @@ public static partial class ChassisHandler
         }
     }
     public static float LAST_MAKE_MECH_TIME = 0f;
-    private static void MakeMech(SimGameState sim, int other_parts, int all_used_parts, int used_empty_parts)
+    private static MechDef MakeMech(SimGameState sim, int other_parts, int all_used_parts, int used_empty_parts)
     {
         Log.Main.Debug?.Log($"Mech Assembly started for {mech.Description.UIName}");
         MechDef new_mech = new MechDef(mech, mechBay.Sim.GenerateSimGameUID(), true);
@@ -408,6 +412,7 @@ public static partial class ChassisHandler
             Log.Main.Error?.Log($"ERROR in MakeMech", e);
         }
         LAST_MAKE_MECH_TIME = Time.time;
+        return new_mech;
     }
     public static void ReplaceWith(SimGameState sim, MechDef existingMech, MechDef replaceMech, out int parts, out int chassis)
     {
@@ -463,7 +468,7 @@ public static partial class ChassisHandler
             foreach (var unit in sim.ActiveMechs)
             {
                 if (unit.Value == null) { continue; }
-                if (unit.Value.Chassis.Is<LootableUniqueMech>(out var ulm))
+                if (unit.Value.Chassis.Is<LootableUniqueMech>(out var ulm) && !ulm.BlockAssembly)
                 {
                     var replaceMech = unit.Value.FindMechReplace(ulm, sim);
                     ReplaceWith(sim, unit.Value, replaceMech, out var parts, out var chassis);
@@ -484,12 +489,12 @@ public static partial class ChassisHandler
                     {
                         if (parts != 0)
                         {
-                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.PARTS/__", parts, unit.Value.Chassis.VariantName, replaceMech.Chassis.VariantName).ToString());
+                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.PARTS/__", parts, replaceMech.Chassis.VariantName).ToString());
                             needMessage = true;
                         }
                         if (chassis != 0)
                         {
-                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.CHASSIS/__", chassis, unit.Value.Chassis.VariantName, replaceMech.Chassis.VariantName).ToString());
+                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.CHASSIS/__", chassis, replaceMech.Chassis.VariantName).ToString());
                             needMessage = true;
                         }
                     }
@@ -498,7 +503,7 @@ public static partial class ChassisHandler
             foreach (var unit in sim.ReadyingMechs)
             {
                 if (unit.Value == null) { continue; }
-                if (unit.Value.Chassis.Is<LootableUniqueMech>(out var ulm))
+                if (unit.Value.Chassis.Is<LootableUniqueMech>(out var ulm) && !ulm.BlockAssembly)
                 {
                     var replaceMech = unit.Value.FindMechReplace(ulm, sim);
                     ReplaceWith(sim, unit.Value, replaceMech, out var parts, out var chassis);
@@ -519,12 +524,12 @@ public static partial class ChassisHandler
                     {
                         if (parts != 0)
                         {
-                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.PARTS/__", parts, unit.Value.Chassis.VariantName, replaceMech.Chassis.VariantName).ToString());
+                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.PARTS/__", parts, replaceMech.Chassis.VariantName).ToString());
                             needMessage = true;
                         }
                         if (chassis != 0)
                         {
-                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.CHASSIS/__", chassis, unit.Value.Chassis.VariantName, replaceMech.Chassis.VariantName).ToString());
+                            message.AppendLine(new Localize.Text("__/CS.UNITS_REPLACED.REPLACED.CHASSIS/__", chassis, replaceMech.Chassis.VariantName).ToString());
                             needMessage = true;
                         }
                     }
@@ -550,6 +555,33 @@ public static partial class ChassisHandler
         }
     }
 
+    internal static void AddMechParts(SimGameState sim, MechDef mech)
+    {
+        int numParts = mech.IsSquad() ? PartsNumCalculations.SquadPartsCount(mech) : Control.Instance.GetNumParts(mech);
+        Log.Main.Debug?.Log($"Adding {numParts} of mech {mech.Description.Id} to inventory.");
+        for (int i = 0; i < numParts; i++)
+        {
+            sim.AddItemStat(mech.Description.Id, "MECHPART", false);
+        }
+    }
+
+    internal static void RemoveArmorFromMech(MechDef mechDef)
+    {
+        Log.Main.Debug?.Log($"--- Removing armor for Mech {mechDef.Description.Id}");
+        foreach (LocationLoadoutDef location in mechDef.Locations)
+        {
+            if (location.AssignedArmor > 0)
+            {
+                location.AssignedArmor = 0;
+                location.CurrentArmor = 0;
+                if (location.CurrentRearArmor > 0)
+                {
+                    location.CurrentRearArmor = 0;
+                    location.AssignedRearArmor = 0;
+                }
+            }
+        }
+    }
 
     public static void StartDialog()
     {
@@ -1121,7 +1153,11 @@ public static partial class ChassisHandler
                 Log.Main.Debug?.Log($"- {item.mechid}[{item.mechname}] {item.used}/{item.spare}/{item.count}");
             var op = used_parts.Where(i => i.mechid != mech.Description.Id).Sum(i => i.used);
             Log.Main.Debug?.Log($"-- making mech other_parts:{op} total used {all_parts}/{used_empty_parts}");
-            MakeMech(mechBay.Sim, op, all_parts, used_empty_parts);
+            MechDef createdMech = MakeMech(mechBay.Sim, op, all_parts, used_empty_parts);
+            if (Control.Instance.Settings.RemoveArmorOnAssembly)
+            {
+                RemoveArmorFromMech(createdMech);
+            }
             used_parts.Clear();
             Log.Main.Debug?.Log($"-- refresh mechlab");
             mechBay.RefreshData(false);
@@ -1196,8 +1232,9 @@ public static partial class ChassisHandler
         }
         return result;
     }
-    public static MechDef FindMechReplace(SimGameState simgame, ContractHelper contract, MechDef mech)
+    public static MechDef FindMechReplace(SimGameState simgame, ContractHelper contract, MechDef mech, out bool forceDisassemble)
     {
+        forceDisassemble = false;
         if (mech == null)
         {
             return null;
@@ -1227,6 +1264,12 @@ public static partial class ChassisHandler
             }
         }else if (mech.Chassis.Is<LootableUniqueMech>(out var ulm) && (simgame.IsHaveChassis(mech.ChassisID) || contract.IsChassisExistsFinalPotentialSalvage(mech.ChassisID)) )
         {
+            if (ulm.BlockAssembly)
+            {
+                Log.Main.Debug?.Log($"--- Mech {mech.ChassisID} is unique and already assembled, forcing disassembly.");
+                forceDisassemble = true;
+                return null;
+            }
             try
             {
                 result = mech.FindMechReplace(ulm, simgame);

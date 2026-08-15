@@ -67,4 +67,5 @@ public class LootableUniqueMech : SimpleCustomChassis
 {
     public string ReplaceID { get; set; }
     public SearchTags randomSearchTags { get; set; } = new SearchTags();
+    public bool BlockAssembly { get; set; } = false;
 }

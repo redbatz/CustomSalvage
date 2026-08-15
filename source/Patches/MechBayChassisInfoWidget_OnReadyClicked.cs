@@ -67,6 +67,19 @@ public static class MechBayChassisInfoWidget_OnReadyClicked
             if (__instance.selectedChassis.Is<LootableUniqueMech>(out var ulm) && __instance.mechBay.Sim.IsHaveActiveChassis(__instance.selectedChassis.Description.Id))
             {
                 Log.Main.Debug?.Log($"Detected unique chassis {__instance.selectedChassis.Description.Id} that is already in bays");
+                if (ulm.BlockAssembly)
+                {
+                    Log.Main.Debug?.Log($"Blocking assembly of unique chassis {__instance.selectedChassis.Description.Id} that is already assembled");
+                    string mechDefId = __instance.selectedChassis.Description.Id.Replace("chassisdef_", "mechdef_");
+                    string name = UnityGameInstance.BattleTechGame.DataManager.MechDefs.TryGet(mechDefId, out MechDef mech) 
+                        ? mech.Description.UIName : __instance.selectedChassis.Description.UIName;
+                    string message = new Localize.Text("__/CS.UNITS_REPLACED.BLOCKED.ASSEMBLY/__", name).ToString();
+                    __instance.mechBay.Sim.interruptQueue.QueuePauseNotification("__/CS.UNITS_REPLACED.TITLE/__", message,
+                        __instance.mechBay.Sim.GetCrewPortrait(SimGameCrew.Crew_Yang), null, () => { });
+
+                    __runOriginal = false;
+                    return;
+                }
                 ChassisHandler.SanitizeUniqueUnits(__instance.mechBay.Sim);
                 __instance.mechBay.RefreshData(false);
                 __runOriginal = false;
