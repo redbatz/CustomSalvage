@@ -176,6 +176,7 @@ internal static class Contract_CreateMechPlacementPopup
                         }
                     }
                 }
+                SalvageChanceHelper.RollInventory(m, __instance);
                 //Log.Main.Debug?.Log(m.ToJSON());
                 Thread.CurrentThread.ClearFlag("IN_ResolveCompleteContract");
                 try

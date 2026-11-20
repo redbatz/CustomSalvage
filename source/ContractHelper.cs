@@ -67,7 +67,7 @@ public class ContractHelper
 
         if (!def.CCFlags().NoSalvage)
         {
-            if (salvageChance == null || RollSalvageChance(def, salvageChance))
+            if (salvageChance == null || SalvageChanceHelper.RollSalvageChance(def.Description.Id, salvageChance, Contract.BattleTechGame.Simulation))
             {
                 return def;
             }
@@ -83,46 +83,22 @@ public class ContractHelper
             {
                 Log.Main.Warning?.Log($"{def.Description.Id}: illegal combination of no_salvage and SalvageChance with DropLootableDefault false, SalvageChance ignored");
             }
-            else if (!RollSalvageChance(def, salvageChance))
+            else if (!SalvageChanceHelper.RollSalvageChance(def.Description.Id, salvageChance, Contract.BattleTechGame.Simulation))
             {
                 return null;
             }
         }
 
-        if (!def.Is<LootableDefault>(out var lootable))
-        {
-            return null;
-        }
-
-        var lootableDef = UnityGameInstance.BattleTechGame.DataManager.GetMechComponentDef(def.ComponentType, lootable.ItemID);
-        if (lootableDef == null)
-        {
-            return null;
-        }
-
-        if (lootableDef.CCFlags().NoSalvage)
-        {
-            return null;
-        }
-        return lootableDef;
+        return SalvageChanceHelper.GetLootableDefault(def);
     }
-
-    private bool RollSalvageChance(MechComponentDef def, SalvageChanceCustom salvageChance)
-    {
-        float roll = Contract.BattleTechGame.Simulation.NetworkRandom.Float();
-        bool success = roll < salvageChance.Chance;
-        Log.Main.Debug?.Log($"--- {def.Description.Id} salvage chance roll {roll:0.000} vs {salvageChance.Chance:0.00}: {(success ? "passed" : "failed")}");
-        return success;
-    }    
 
     public static bool isSalvagable(MechComponentDef def)
     {
-        if (def.CCFlags().NoSalvage == false) { return true; }
-        if (def.Is<LootableDefault>(out var lootable) == false) { return false; }
-        var lootableDef = UnityGameInstance.BattleTechGame.DataManager.GetMechComponentDef(def.ComponentType, lootable.ItemID);
-        if (lootableDef == null) { return false; }
-        if (lootableDef.CCFlags().NoSalvage) { return false; }
-        return true;
+        if (!def.CCFlags().NoSalvage)
+        {
+            return true;
+        }
+        return SalvageChanceHelper.GetLootableDefault(def) != null;
     }
 
     public void AddComponentToFinalSalvage(MechComponentDef def)
