@@ -151,13 +151,9 @@ internal static class Contract_GenerateSalvage
         }
         num3 = Mathf.Max(0f, num5 - num4 * (float)lostUnits.Count);
         int num7 = Mathf.FloorToInt(num6 * num3);
-        if (num2 > 0)
-        {
-            num2 += Constants.Finances.ContractFloorSalvageBonus;
-        }
 
         Contract.Contract.FinalSalvageCount = num7;
-        Contract.Contract.FinalPrioritySalvageCount = Math.Min(7, Mathf.FloorToInt((float)num7 * Constants.Salvage.PrioritySalvageModifier));
+        Contract.Contract.FinalPrioritySalvageCount = Mathf.FloorToInt(num7 * Constants.Salvage.PrioritySalvageModifier);
     }
 
     public static void ProccessPlayerMech(UnitResult unitResult, ContractHelper Contract)

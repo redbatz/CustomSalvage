@@ -1,31 +1,150 @@
-﻿using BattleTech.UI;
+﻿using System;
 using BattleTech;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using UnityEngine;
-using BattleTech.BinkMedia;
+using BattleTech.UI;
 using CustomComponents;
+using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace CustomSalvage;
 
 public class AAR_SalvageChosenCustom: MonoBehaviour
 {
+    private const int VisibleRows = 8;
     public AAR_SalvageChosen parent;
-    public void Init(AAR_SalvageChosen parent)
+    private ScrollRect scrollRect;
+    private LayoutElement scrollLayoutElement;
+    public void Init(AAR_SalvageChosen parentElement)
     {
-        this.parent = parent;
-        while (this.parent.tempHoldingGridSpaces.Count > 1)
+        parent = parentElement;
+        while (parent.tempHoldingGridSpaces.Count > 1)
         {
-            var go = this.parent.tempHoldingGridSpaces[this.parent.tempHoldingGridSpaces.Count - 1];
-            this.parent.tempHoldingGridSpaces.RemoveAt(this.parent.tempHoldingGridSpaces.Count - 1);
-            GameObject.DestroyImmediate(go);
+            GameObject gameObjectElement = parent.tempHoldingGridSpaces[parent.tempHoldingGridSpaces.Count - 1];
+            parent.tempHoldingGridSpaces.RemoveAt(parent.tempHoldingGridSpaces.Count - 1);
+            DestroyImmediate(gameObjectElement);
         }
+        InitScroll();
     }
-    public void Refresh()
+
+    private void InitScroll()
+    {
+        if (scrollRect != null)
+        {
+            return;
+        }
+
+        RectTransform content = parent.chosenListParent as RectTransform;
+        ScrollRect template = FindScrollRect(parent.leftoverListParent);
+        if (content == null || template == null || template.verticalScrollbar == null)
+        {
+            Log.Main.Warning?.Log($"AAR_SalvageChosenCustom unable to make the salvage list scrollable. Content exist={content != null}. Template exist={template != null}.");
+            return;
+        }
+
+        RectTransform scrollBox = CreateScrollBox(content);
+        RectTransform viewport = CreateViewport(scrollBox);
+        scrollBox.gameObject.SetActive(content.gameObject.activeSelf);
+        MoveContentIntoViewport(content, viewport);
+        if (parent.PriorityAreaBackground != null)
+        {
+            parent.PriorityAreaBackground.transform.SetParent(scrollBox, false);
+            parent.PriorityAreaBackground.transform.SetAsFirstSibling();
+        }
+
+        scrollRect = CreateScrollRect(scrollBox, content, viewport, template);
+        parent.PriorityArea = scrollBox.gameObject;
+    }
+
+    private RectTransform CreateScrollBox(RectTransform content)
+    {
+        GameObject scrollGameObject = new GameObject("PrioritySlots_scrollview", typeof(RectTransform));
+        scrollGameObject.layer = content.gameObject.layer;
+        RectTransform scrollTransform = scrollGameObject.GetComponent<RectTransform>();
+        scrollTransform.SetParent(content.parent, false);
+        scrollTransform.SetSiblingIndex(content.GetSiblingIndex());
+        scrollTransform.sizeDelta = new Vector2(content.sizeDelta.x, 0f);
+        scrollLayoutElement = scrollGameObject.AddComponent<LayoutElement>();
+        return scrollTransform;
+    }
+
+    private static RectTransform CreateViewport(RectTransform scrollTransform)
+    {
+        GameObject viewportGameObject = new GameObject("Viewport", typeof(RectTransform));
+        viewportGameObject.layer = scrollTransform.gameObject.layer;
+        RectTransform viewport = viewportGameObject.GetComponent<RectTransform>();
+        viewport.SetParent(scrollTransform, false);
+        viewport.anchorMin = Vector2.zero;
+        viewport.anchorMax = Vector2.one;
+        viewport.pivot = new Vector2(0f, 1f);
+        viewport.sizeDelta = Vector2.zero;
+        viewport.anchoredPosition = Vector2.zero;
+        viewportGameObject.AddComponent<Image>().color = Color.clear;
+        viewportGameObject.AddComponent<RectMask2D>();
+        return viewport;
+    }
+
+    private static void MoveContentIntoViewport(RectTransform content, RectTransform viewport)
+    {
+        content.gameObject.SetActive(true);
+        content.SetParent(viewport, false);
+        content.anchorMin = new Vector2(0f, 1f);
+        content.anchorMax = new Vector2(0f, 1f);
+        content.pivot = new Vector2(0f, 1f);
+        content.anchoredPosition = Vector2.zero;
+    }
+
+    private static ScrollRect CreateScrollRect(RectTransform scrollTransform, RectTransform content, RectTransform viewport, ScrollRect template)
+    {
+        ScrollRect result = scrollTransform.gameObject.AddComponent<ScrollRect>();
+        result.content = content;
+        result.viewport = viewport;
+        result.horizontal = false;
+        result.vertical = true;
+        result.movementType = template.movementType;
+        result.elasticity = template.elasticity;
+        result.inertia = template.inertia;
+        result.decelerationRate = template.decelerationRate;
+        result.scrollSensitivity = template.scrollSensitivity;
+        Scrollbar bar = Instantiate(template.verticalScrollbar, scrollTransform, false);
+        bar.gameObject.layer = scrollTransform.gameObject.layer;
+        result.verticalScrollbar = bar;
+        result.verticalScrollbarVisibility = template.verticalScrollbarVisibility;
+        result.verticalScrollbarSpacing = template.verticalScrollbarSpacing;
+        return result;
+    }
+
+    private void UpdateScrollHeight()
+    {
+        if (scrollRect == null)
+        {
+            return;
+        }
+
+        GridLayoutGroup grid = scrollRect.content.GetComponent<GridLayoutGroup>();
+        int rows = parent.PriorityInventory.Count + (parent.tempHoldingGridSpaces[0].activeSelf ? 1 : 0);
+        int visibleRows = Mathf.Min(rows, VisibleRows);
+        float padding = grid.padding.vertical;
+        float slots = grid.cellSize.y * visibleRows;
+        float spacing = grid.spacing.y * Mathf.Max(visibleRows - 1, 0);
+        scrollLayoutElement.preferredHeight = padding + slots + spacing;
+    }
+
+    private static ScrollRect FindScrollRect(Transform transform)
+    {
+        while (transform != null)
+        {
+            ScrollRect result = transform.GetComponent<ScrollRect>();
+            if (result != null)
+            {
+                return result;
+            }
+
+            transform = transform.parent;
+        }
+        return null;
+    }
+    
+    public void Refresh(bool scrollToEnd = false)
     {
         int curSalvageWeight = this.parent.contract.GetSalvageWeight(this.parent.PriorityInventory);
         int restSalvage = this.parent.contract.FinalSalvageCount - curSalvageWeight;
@@ -49,7 +168,12 @@ public class AAR_SalvageChosenCustom: MonoBehaviour
         this.parent.ApplySorting();
         this.parent.TestHaveAllPriority();
         this.parent.PriorityAreaBackground.transform.SetAsFirstSibling();
+        UpdateScrollHeight();
         this.parent.ForceRefreshImmediate();
+        if (scrollToEnd && scrollRect != null)
+        {
+            scrollRect.verticalNormalizedPosition = 0f;
+        }
     }
 }
 
@@ -267,7 +391,7 @@ internal static class AAR_SalvageChosen_OnAddItem
             AAR_SalvageChosenCustom custom = __instance.gameObject.GetComponent<AAR_SalvageChosenCustom>();
             if (custom != null)
             {
-                custom.Refresh();
+                custom.Refresh(true);
             }
             else
             {
